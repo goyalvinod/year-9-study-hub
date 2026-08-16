@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Parent Dashboard · Year 9 Study Hub</title>
+  <link rel="stylesheet" href="assets/style.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='24' font-size='24'%3E%F0%9F%93%8A%3C/text%3E%3C/svg%3E">
+</head>
+<body>
+  <nav class="topnav">
+    <a class="brand" href="index.html"><span class="brand-emoji">🚀</span> Year 9 <span>Study Hub</span></a>
+    <div class="nav-links">
+      <a class="nav-link" href="index.html">← Back to site</a>
+      <a class="nav-link active" href="dashboard.html">Parent dashboard</a>
+    </div>
+  </nav>
+
+  <main class="wrap-wide">
+    <h1>📊 Parent Dashboard</h1>
+    <p class="lead">Read-only progress summary. Data lives in this browser's <code>localStorage</code>. Use Export / Import to move it between devices.</p>
+
+    <div id="dash-content"></div>
+
+    <div class="panel">
+      <h2 style="margin-top:0">Backup &amp; sync</h2>
+      <p style="color:var(--muted); font-size:14px">Progress is saved on this device only. To move progress between devices, export from one and import on the other.</p>
+      <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px">
+        <button class="primary" id="btn-export">Download backup</button>
+        <label class="ghost" style="display:inline-flex; align-items:center; cursor:pointer; padding: 8px 14px; border: 1px solid var(--border); border-radius: 10px;">
+          Import backup
+          <input type="file" id="file-import" accept="application/json" style="display:none">
+        </label>
+        <button class="ghost" id="btn-reset" style="color:var(--bad); border-color:var(--bad)">Reset all progress</button>
+      </div>
+      <div id="io-status" style="margin-top:10px; font-size:13px; color:var(--muted)"></div>
+    </div>
+  </main>
+
+  <footer>
+    Parent dashboard · progress saved in this browser
+  </footer>
+
+  <script src="assets/core.js"></script>
+  <script src="assets/gamify.js"></script>
+  <script src="assets/svg.js"></script>
+  <script src="assets/questions.js"></script>
+  <script src="assets/content.js"></script>
+  <script src="assets/y9.js"></script>
+  <script src="assets/physics.js"></script>
+  <script src="assets/chemistry.js"></script>
+  <script src="assets/computing.js"></script>
+  <script src="assets/history.js"></script>
+  <script src="assets/geography.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    const state = window.Core.state;
+    const $ = (id) => document.getElementById(id);
+
+    const SUBJECTS = [
+      { id: 'maths', name: 'Mathematics', icon: '∫', color: 'var(--c-maths)' },
+      { id: 'physics', name: 'Physics', icon: '⚛', color: 'var(--c-physics)' },
+      { id: 'chemistry', name: 'Chemistry', icon: '⚗', color: 'var(--c-chemistry)' },
+      { id: 'computing', name: 'Computing', icon: '</>', color: 'var(--c-computing)' },
+      { id: 'history', name: 'History', icon: '📜', color: 'var(--c-history)' },
+      { id: 'geography', name: 'Geography', icon: '🌍', color: 'var(--c-geography)' }
+    ];
+
+    function esc(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+    function pct(c, t) { return t ? Math.round(c/t*100) + '%' : '—'; }
+    function timeAgo(iso) {
+      if (!iso) return 'never';
+      const d = (Date.now() - new Date(iso).getTime()) / 1000;
+      if (d < 60) return 'just now';
+      if (d < 3600) return Math.floor(d/60) + 'm ago';
+      if (d < 86400) return Math.floor(d/3600) + 'h ago';
+      if (d < 86400*7) return Math.floor(d/86400) + 'd ago';
+      return new Date(iso).toLocaleDateString();
+    }
+
+    function renderDash() {
+      const g = state.global;
+      const p = window.Gamify.progressToNext(state.xp || 0);
+      const earned = window.Gamify.earnedBadges();
+      const container = $('dash-content');
+
+      const daysActive = Object.keys(state.daily || {}).length;
+      const today = window.Core.todayKey();
+      const todayStats = (state.daily || {})[today] || { attempted: 0, correct: 0 };
+
+      // -------- Level panel --------
+      const levelPanel = `
+        <div class="level-panel">
+          <div class="lp-icon">${p.cur.icon}</div>
+          <div class="lp-body">
+            <div class="lp-name">Level ${p.cur.level} · ${esc(p.cur.name)}</div>
+            <div class="lp-sub">${p.nxt ? `${p.need} XP until <strong>${esc(p.nxt.name)}</strong>` : 'Top level reached!'}</div>
+            <div class="progress" style="margin-top:8px"><div class="bar" style="width:${p.pct}%"></div></div>
+          </div>
+          <div class="lp-xp">${state.xp || 0} XP<br><span style="color:var(--weak);font-size:13px">🪙 ${state.coins || 0}</span></div>
+        </div>`;
+
+      // -------- Big stat tiles --------
+      const tiles = [
+        { n: g.attempted, l: 'Questions attempted' },
+        { n: pct(g.correct, g.attempted), l: 'Overall accuracy' },
+        { n: g.streak, l: 'Current streak 🔥' },
+        { n: g.best, l: 'Best streak' },
+        { n: daysActive, l: 'Days active' },
+        { n: todayStats.attempted, l: 'Today' },
+        { n: earned.length, l: 'Badges earned' },
+        { n: window.Gamify.consecutiveDays(), l: 'Day streak 📅' }
+      ];
+      const tilesHtml = tiles.map(t =>
+        `<div class="stat-big"><span class="n">${t.n}</span><span class="l">${t.l}</span></div>`
+      ).join('');
+
+      // -------- Per-subject breakdown --------
+      const subjectRows = SUBJECTS.map(sub => {
+        const st = window.Core.subjectStats(sub.id);
+        const barClass = !st.attempted ? '' : (st.correct / st.attempted) >= 0.8 ? 'good' : (st.correct / st.attempted) >= 0.5 ? '' : 'weak';
+        return `
+          <div class="subject-row">
+            <span class="icon" style="color:${sub.color}; font-size:22px; min-width:32px">${sub.icon}</span>
+            <span class="name">${esc(sub.name)}</span>
+            <div style="min-width:150px">
+              <div class="progress" style="margin:0"><div class="bar ${barClass}" style="width:${st.attempted ? (st.correct/st.attempted*100) : 0}%"></div></div>
+              <div style="font-size:11px; color:var(--muted); text-align:right; margin-top:2px">${st.attempted} attempted · ${pct(st.correct, st.attempted)}</div>
+            </div>
+          </div>`;
+      }).join('');
+
+      // -------- Per-topic table (all subjects) --------
+      const topicRows = (window.Questions.topics || []).map(t => {
+        const subject = t.subject || 'maths';
+        const st = window.Core.topicStats(subject, t.key);
+        const acc = st.total ? (st.correct / st.total) : 0;
+        const accClass = st.total === 0 ? '' : acc >= 0.8 ? 'good' : acc >= 0.5 ? '' : 'weak';
+        const badge = st.total >= 10 && acc >= 0.8 ? '<span class="tag mastered">mastered</span>' :
+                      t.weak ? '<span class="tag weak">weak</span>' :
+                      t.olympiad ? '<span class="tag olympiad">olympiad</span>' : '';
+        const sub = SUBJECTS.find(s => s.id === subject) || { name: 'Maths' };
+        return `
+          <tr>
+            <td><span style="color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:0.05em">${sub.name}</span></td>
+            <td>${esc(t.label)} ${badge}</td>
+            <td class="num">${st.total}</td>
+            <td class="num">${st.correct}</td>
+            <td class="num">${pct(st.correct, st.total)}</td>
+            <td class="num">${st.best}</td>
+            <td>${timeAgo(st.lastSeen)}</td>
+            <td style="min-width:80px"><div class="progress" style="margin:0"><div class="bar ${accClass}" style="width:${st.total ? acc*100 : 0}%"></div></div></td>
+          </tr>`;
+      }).join('');
+
+      // -------- Heatmap: last 60 days --------
+      const days = 60;
+      const heatCells = [];
+      const now = new Date();
+      const maxDaily = Math.max(1, ...Object.values(state.daily || {}).map(d => d.attempted));
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(now); d.setDate(d.getDate() - i);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const key = `${y}-${m}-${day}`;
+        const v = (state.daily || {})[key] ? state.daily[key].attempted : 0;
+        let level = 0;
+        if (v > 0) {
+          const frac = v / maxDaily;
+          if (frac >= 0.75) level = 4;
+          else if (frac >= 0.5) level = 3;
+          else if (frac >= 0.25) level = 2;
+          else level = 1;
+        }
+        heatCells.push(`<div class="heat-cell l${level}" title="${key}: ${v} attempts"></div>`);
+      }
+
+      // -------- Badge gallery --------
+      const badges = window.Gamify.BADGES.map(b => {
+        const e = state.badges[b.id];
+        return `
+          <div class="badge-tile ${e ? 'earned' : 'locked'}">
+            <div class="b-icon">${b.icon}</div>
+            <div class="b-name">${esc(b.name)}</div>
+            <div class="b-desc">${esc(b.desc)}</div>
+            ${e ? `<div class="b-when">${new Date(e).toLocaleDateString()}</div>` : ''}
+          </div>`;
+      }).join('');
+
+      container.innerHTML = `
+        ${levelPanel}
+        <div class="dash-grid">${tilesHtml}</div>
+
+        <div class="grid" style="grid-template-columns: 1.4fr 1fr; gap: 14px">
+          <div class="panel">
+            <h2 style="margin-top:0">Activity — last ${days} days</h2>
+            <div class="heatmap">${heatCells.join('')}</div>
+            <div style="color:var(--muted); font-size:12px; margin-top:6px">Each cell = 1 day. Darker = more questions attempted.</div>
+          </div>
+          <div class="panel">
+            <h2 style="margin-top:0">By subject</h2>
+            ${subjectRows}
+          </div>
+        </div>
+
+        <div class="panel">
+          <h2 style="margin-top:0">🏆 Badges (${earned.length}/${window.Gamify.BADGES.length})</h2>
+          <div class="badge-grid">${badges}</div>
+        </div>
+
+        <div class="panel">
+          <h2 style="margin-top:0">Per-topic breakdown</h2>
+          <div style="overflow-x:auto">
+            <table class="dash">
+              <thead>
+                <tr>
+                  <th>Subject</th>
+                  <th>Topic</th>
+                  <th class="num">Attempts</th>
+                  <th class="num">Correct</th>
+                  <th class="num">Accuracy</th>
+                  <th class="num">Best streak</th>
+                  <th>Last seen</th>
+                  <th>Progress</th>
+                </tr>
+              </thead>
+              <tbody>${topicRows}</tbody>
+            </table>
+          </div>
+        </div>
+      `;
+
+      const mediaStyle = document.getElementById('dash-media') || document.createElement('style');
+      mediaStyle.id = 'dash-media';
+      mediaStyle.textContent = `
+        @media (max-width: 720px) {
+          .dash-grid { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+          .grid[style*="1.4fr 1fr"] { grid-template-columns: 1fr !important; }
+        }
+      `;
+      if (!mediaStyle.parentNode) document.head.appendChild(mediaStyle);
+    }
+
+    function download(filename, text) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([text], {type: 'application/json'}));
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    $('btn-export').addEventListener('click', () => {
+      const d = new Date();
+      const stamp = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      download(`study_hub_progress_${stamp}.json`, window.Core.exportJSON());
+      $('io-status').textContent = `Backup downloaded.`;
+    });
+
+    $('file-import').addEventListener('change', (e) => {
+      const f = e.target.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = () => {
+        try {
+          window.Core.importJSON(r.result);
+          $('io-status').textContent = `Imported. Refreshing…`;
+          setTimeout(() => location.reload(), 400);
+        } catch (err) {
+          $('io-status').textContent = `Import failed: ${err.message}`;
+        }
+      };
+      r.readAsText(f);
+    });
+
+    $('btn-reset').addEventListener('click', () => {
+      if (!confirm('Reset ALL progress on this device? This can\'t be undone (unless you have a backup).')) return;
+      window.Core.resetAll();
+      renderDash();
+      $('io-status').textContent = 'All progress reset.';
+    });
+
+    renderDash();
+  })();
+  </script>
+</body>
+</html>
