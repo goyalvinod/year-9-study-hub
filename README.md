@@ -83,14 +83,58 @@ Tectonics · Weather & climate · Rivers · Coasts · Ecosystems & biomes · Pop
 
 ## How progress works
 
-Everything lives in `localStorage` on this device.
+Progress lives in `localStorage` on each device **and** in a shared Cloudflare KV
+store, so the parent dashboard on one device shows Ishaan's activity from another
+device within ~5 seconds.
 
-- Each device (laptop, phone, tablet) will have its own separate progress unless you sync.
-- Use the **Parent dashboard** → **Download backup** to export a JSON snapshot.
-- Import the same JSON on another device to sync.
+- The practice pages **push** state to the Worker after every answered question
+  (debounced 600ms).
+- The dashboard **pulls** state every 5 seconds.
+- If the network is down, the site keeps working — the next successful push wins.
+- If you never set up the sync (no `sync-config.js`), everything falls back to
+  local-only mode and you can move progress between devices using the dashboard's
+  Download / Import backup buttons.
 
-If you later want automatic cross-device sync, a Cloudflare Worker + D1 (or Supabase) can add a
-tiny sync API on the free tier.
+## Cross-device sync setup (Cloudflare)
+
+One-time. See `worker/README.md` for full commands.
+
+1. **Deploy the Worker**
+   ```bash
+   cd worker
+   npx wrangler login
+   npx wrangler kv namespace create STUDY_HUB   # paste id into wrangler.toml
+   openssl rand -hex 32                          # copy this token
+   npx wrangler secret put SYNC_TOKEN            # paste the token
+   npx wrangler deploy                           # note the worker URL
+   ```
+
+2. **Host the site on Cloudflare Pages**
+   - Cloudflare dashboard → Workers & Pages → Create → Pages → **Connect to Git**
+   - Pick `goyalvinod/year-9-study-hub`
+   - Build command: `bash site/build.sh`
+   - Build output directory: `site`
+   - Environment variables (Production **and** Preview):
+     - `WORKER_URL` = the URL from `wrangler deploy`
+     - `SYNC_TOKEN` = the token from step 1
+   - Deploy. Bookmark `https://year-9-study-hub.pages.dev/` (kid) and
+     `https://year-9-study-hub.pages.dev/dashboard.html` (parent).
+
+3. **Verify**
+   Open the site on your phone, answer a question. Within ~5s the number on the
+   dashboard on your laptop should tick up — no refresh needed. There's a
+   "last update Xs ago" indicator under the title on the dashboard.
+
+## Running locally
+
+```bash
+cd site
+python3 -m http.server 8000
+# open http://localhost:8000
+```
+
+If you want the local site to sync too, copy `assets/sync-config.example.js` to
+`assets/sync-config.js` and fill in the real values. That file is git-ignored.
 
 ## Extending
 

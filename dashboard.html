@@ -18,13 +18,13 @@
 
   <main class="wrap-wide">
     <h1>📊 Parent Dashboard</h1>
-    <p class="lead">Read-only progress summary. Data lives in this browser's <code>localStorage</code>. Use Export / Import to move it between devices.</p>
+    <p class="lead">Read-only progress summary. <span id="sync-indicator" style="font-size:13px; color:var(--muted); margin-left:6px"></span></p>
 
     <div id="dash-content"></div>
 
     <div class="panel">
       <h2 style="margin-top:0">Backup &amp; sync</h2>
-      <p style="color:var(--muted); font-size:14px">Progress is saved on this device only. To move progress between devices, export from one and import on the other.</p>
+      <p style="color:var(--muted); font-size:14px">Progress syncs across devices automatically via Cloudflare. You can also download a local JSON snapshot as a belt-and-braces backup.</p>
       <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px">
         <button class="primary" id="btn-export">Download backup</button>
         <label class="ghost" style="display:inline-flex; align-items:center; cursor:pointer; padding: 8px 14px; border: 1px solid var(--border); border-radius: 10px;">
@@ -41,6 +41,8 @@
     Parent dashboard · progress saved in this browser
   </footer>
 
+  <script src="assets/sync-config.js"></script>
+  <script src="assets/sync.js"></script>
   <script src="assets/core.js"></script>
   <script src="assets/gamify.js"></script>
   <script src="assets/svg.js"></script>
@@ -282,6 +284,43 @@
     });
 
     renderDash();
+
+    // ---------- Live sync from Cloudflare ----------
+    const indicator = document.getElementById('sync-indicator');
+    function fmtAgo(iso) {
+      if (!iso) return 'never';
+      const d = (Date.now() - new Date(iso).getTime()) / 1000;
+      if (d < 5) return 'just now';
+      if (d < 60) return Math.floor(d) + 's ago';
+      if (d < 3600) return Math.floor(d/60) + 'm ago';
+      if (d < 86400) return Math.floor(d/3600) + 'h ago';
+      return new Date(iso).toLocaleString();
+    }
+    function refreshIndicator() {
+      if (!window.Sync || !window.Sync.configured) {
+        indicator.textContent = '· sync not configured (local only)';
+        indicator.style.color = 'var(--muted)';
+        return;
+      }
+      const st = window.Sync.status;
+      const ts = window.Sync.lastUpdatedAt;
+      let label = '';
+      let colour = 'var(--muted)';
+      if (st === 'error') { label = '⚠ sync error — retrying'; colour = 'var(--bad)'; }
+      else if (st === 'pulling') { label = '⟳ syncing…'; }
+      else if (ts) { label = `· last update ${fmtAgo(ts)}`; }
+      else { label = '· waiting for first sync…'; }
+      indicator.textContent = label;
+      indicator.style.color = colour;
+    }
+    refreshIndicator();
+    document.addEventListener('sync:status', refreshIndicator);
+    document.addEventListener('sync:changed', () => { renderDash(); refreshIndicator(); });
+    setInterval(refreshIndicator, 1000);
+
+    if (window.Sync && window.Sync.configured) {
+      setInterval(() => window.Sync.pull(), 5000);
+    }
   })();
   </script>
 </body>

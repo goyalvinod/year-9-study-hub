@@ -1,0 +1,14 @@
+{
+  "name": "study-hub-sync",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Cloudflare Worker: cross-device sync for Year 9 Study Hub",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "dev": "wrangler dev",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

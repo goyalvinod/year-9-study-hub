@@ -1,0 +1,12 @@
+name = "study-hub-sync"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# KV namespace binding.
+# After `wrangler kv namespace create STUDY_HUB`, paste the returned id below.
+[[kv_namespaces]]
+binding = "STUDY_HUB"
+id = "REPLACE_WITH_KV_NAMESPACE_ID"
+
+# Bearer token is stored as a secret, NOT here.
+# Set it once with: npx wrangler secret put SYNC_TOKEN

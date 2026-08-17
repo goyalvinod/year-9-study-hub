@@ -145,6 +145,9 @@
     } catch (e) {
       console.warn('Storage save failed', e);
     }
+    if (window.Sync && typeof window.Sync.onSave === 'function') {
+      window.Sync.onSave();
+    }
   }
 
   const state = load();

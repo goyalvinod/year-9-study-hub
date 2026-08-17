@@ -11,3 +11,11 @@ node_modules/
 
 # Local backups (parent-generated JSON exports should not be committed)
 *_progress_*.json
+
+# Real Cloudflare sync config — contains the bearer token. Generated at build time.
+assets/sync-config.js
+
+# Wrangler / Cloudflare Worker local state
+worker/.wrangler/
+worker/.dev.vars
+worker/node_modules/
